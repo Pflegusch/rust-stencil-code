@@ -1,8 +1,9 @@
 use std::cmp;
 use std::time::Instant;
-use std::thread;
-use std::sync::{Arc, Mutex};
-//use packed_simd_2::*;
+// use std::thread;
+// use std::sync::{Arc, Mutex};
+// use rayon::prelude::*;
+// use packed_simd_2::*;
 
 
 #[allow(dead_code)]
@@ -183,15 +184,15 @@ fn blocked_local_mean(n: usize, b: u8, k: i16, vec: &mut Vec<f32>, transposed: &
 //                         upper_boundary - bottom_boundary + right_boundary - left_boundary;
 //                     let mut sum: f32 = 0.0;
 
-//                     for (int i = left_boundary; i < y; i+=4) {
-//                         Vec4f tmp;
-//                         if (i + 4 < y)
-//                             tmp.load(&vec[x*N + i]);
-//                         else
-//                             tmp.load_partial(y - i, &vec[x*N + i]);
+//                     // for (int i = left_boundary; i < y; i+=4) {
+//                     //     Vec4f tmp;
+//                     //     if (i + 4 < y)
+//                     //         tmp.load(&vec[x*N + i]);
+//                     //     else
+//                     //         tmp.load_partial(y - i, &vec[x*N + i]);
 
-//                         result_vec += tmp;
-//                     }
+//                     //     result_vec += tmp;
+//                     // }
 
 //                     for i in (left_boundary as usize..y).step_by(4) {
 //                         if i + 4 < y {
@@ -221,69 +222,57 @@ fn blocked_local_mean(n: usize, b: u8, k: i16, vec: &mut Vec<f32>, transposed: &
 //     }
 // }
 
-// fn blocked_local_mean_multithreaded(n: usize, b: u8, k: i16, vec: &mut Vec<f32>, transposed: &Vec<f32>) {
-//     if n as u8 % b != 0{
-//         println!("N must be divisible through B");
-//         return;
-//     }
+fn blocked_local_mean_multithreaded(n: usize, b: u8, k: i16, vec: &mut Vec<f32>, transposed: &Vec<f32>) {
+    if n as u8 % b != 0{
+        println!("N must be divisible through B");
+        return;
+    }
 
-//     let mut tmp: Vec<f32> = vec![0.0; n*n];
-//     let mut shared_vec = Arc::new(Mutex::from(&vec));
-//     let mut threads = vec![];
-    
-//     for thread_id in 0..4 {
-//         threads.push(thread::spawn({
-//             let clone = Arc::clone(&shared_vec);
-//             move || {
-//                 let mut v = clone.lock().unwrap();
-//             }
+    let mut tmp: Vec<f32> = vec![0.0; n*n];
 
-//             for i in (0..n).step_by(b as usize) {
-//                 for j in (0..n).step_by(b as usize) {
-//                     for x in i..i+b as usize {
-//                         for y in j..j+b as usize {
-//                             let left_boundary: i16 = cmp::max(y as i16 - k, 0);
-//                             let right_boundary: i16 = cmp::min(y as i16 + k, n as i16 - 1);
-//                             let bottom_boundary: i16 = cmp::max(x as i16 - k, 0);
-//                             let upper_boundary: i16 = cmp::min(x as i16 + k, n as i16 - 1);
-//                             let neighbors_count: i16 = 
-//                                 upper_boundary - bottom_boundary + right_boundary - left_boundary;
-//                             let mut sum: f32 = 0.0;
-        
-//                             for i in left_boundary..right_boundary + 1 {
-//                                 if i != y as i16 {
-//                                     sum += vec[x*n + i as usize];
-//                                 }
-//                             }
-        
-//                             for i in bottom_boundary..upper_boundary + 1 {
-//                                 if i != x as i16 {
-//                                     sum += transposed[y*n + i as usize];
-//                                 }
-//                             }
-        
-//                             tmp[x*n + y] = sum / neighbors_count as f32;
-//                         }
-//                     }
-//                 }
-//             }
-        
-//             for x in 0..n {
-//                 for y in 0..n {
-//                     vec[x*n + y] = tmp[x*n + y];
-//                 }
-//             }
-//         }));
-//     }
-//     for t in threads {
-//         t.join().unwrap();
-//     }
-// }
+    for i in (0..n).step_by(b as usize) {
+        for j in (0..n).step_by(b as usize) {
+
+            for x in i..i+b as usize {
+                for y in j..j+b as usize {
+
+                    let left_boundary: i16 = cmp::max(y as i16 - k, 0);
+                    let right_boundary: i16 = cmp::min(y as i16 + k, n as i16 - 1);
+                    let bottom_boundary: i16 = cmp::max(x as i16 - k, 0);
+                    let upper_boundary: i16 = cmp::min(x as i16 + k, n as i16 - 1);
+                    let neighbors_count: i16 = 
+                        upper_boundary - bottom_boundary + right_boundary - left_boundary;
+                    let mut sum: f32 = 0.0;
+
+                    for i in left_boundary..right_boundary + 1 {
+                        if i != y as i16 {
+                            sum += vec[x*n + i as usize];
+                        }
+                    }
+
+                    for i in bottom_boundary..upper_boundary + 1 {
+                        if i != x as i16 {
+                            sum += transposed[y*n + i as usize];
+                        }
+                    }
+
+                    tmp[x*n + y] = sum / neighbors_count as f32;
+                }
+            }
+        }
+    }
+
+    for x in 0..n {
+        for y in 0..n {
+            vec[x*n + y] = tmp[x*n + y];
+        }
+    }
+}
 
 fn main() {
-    let n: usize = 1024;
+    let n: usize = 4;
     let k: i16 = 4;
-    let b: u8 = 32;
+    let b: u8 = 2;
 
     let mut reference: Vec<f32> = vec![0.0; n*n];
     let mut vanilla: Vec<f32> = vec![0.0; n*n];
@@ -299,7 +288,7 @@ fn main() {
 
     let vanilla_transposed: Vec<f32> = transpose(n, &vanilla);
     let blocked_transposed: Vec<f32> = transpose(n, &blocked);
-    // let vectorized_transposed: Vec<f32> = transpose(n, &vectorized);
+    let vectorized_transposed: Vec<f32> = transpose(n, &vectorized);
 
     let mut now = Instant::now();
     reference_solution(n, k, &mut reference);
@@ -319,11 +308,11 @@ fn main() {
     println!("Vectorized:    {}ms", now.elapsed().as_millis());
 
     now = Instant::now();
-    // todo
+    blocked_local_mean_multithreaded(n, b, k, &mut vectorized, &vectorized_transposed);
     println!("Multithreaded: {}ms",now.elapsed().as_millis());
 
     assert_eq!(test_grids(n, &reference, &vanilla), true);
     assert_eq!(test_grids(n, &reference, &blocked), true);
-    assert_eq!(test_grids(n, &reference, &vectorized), false); //todo true
+    assert_eq!(test_grids(n, &reference, &vectorized), true); //todo true
     // assert_eq!(test_grids(n, &reference, &multithreaded), true);
 }

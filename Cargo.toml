@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 packed_simd_2 = "0.3.6"
+rayon = "1.5.1"
 
 [profile.dev]
 opt-level = 3
