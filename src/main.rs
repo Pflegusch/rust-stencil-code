@@ -270,9 +270,9 @@ fn blocked_local_mean_multithreaded(n: usize, b: u8, k: i16, vec: &mut Vec<f32>,
 }
 
 fn main() {
-    let n: usize = 4;
-    let k: i16 = 4;
-    let b: u8 = 2;
+    let n: usize = 4096;
+    let k: i16 = 16;
+    let b: u8 = 32;
 
     let mut reference: Vec<f32> = vec![0.0; n*n];
     let mut vanilla: Vec<f32> = vec![0.0; n*n];
